@@ -19,7 +19,7 @@ use crate::{
     api::{
         bleuuid::{uuid_from_u16, uuid_from_u32},
         AddressType, BDAddr, CentralEvent, Characteristic, Peripheral as ApiPeripheral,
-        PeripheralProperties, ValueNotification, WriteType,
+        PeripheralProperties, Service, ValueNotification, WriteType,
     },
     common::{adapter_manager::AdapterManager, util::notifications_stream_from_broadcast_receiver},
     Error, Result,
@@ -235,13 +235,11 @@ impl ApiPeripheral for Peripheral {
         Ok(l.clone())
     }
 
-    /// The set of characteristics we've discovered for this device. This will be empty until
-    /// `discover_characteristics` is called.
-    fn characteristics(&self) -> BTreeSet<Characteristic> {
+    fn services(&self) -> BTreeSet<Service> {
         self.shared
             .ble_characteristics
             .iter()
-            .map(|item| item.value().to_characteristic())
+            .map(|item| item.value().to_service())
             .collect()
     }
 
@@ -290,10 +288,9 @@ impl ApiPeripheral for Peripheral {
     }
 
     /// Discovers all characteristics for the device. This is a synchronous operation.
-    async fn discover_characteristics(&self) -> Result<Vec<Characteristic>> {
+    async fn discover_services(&self) -> Result<Vec<Characteristic>> {
         let device = self.shared.device.lock().await;
         if let Some(ref device) = *device {
-            let mut characteristics_result = vec![];
             let characteristics = device.discover_characteristics().await?;
             for gatt_characteristic in characteristics {
                 let ble_characteristic = BLECharacteristic::new(gatt_characteristic);
@@ -302,9 +299,8 @@ impl ApiPeripheral for Peripheral {
                     .ble_characteristics
                     .entry(characteristic.uuid.clone())
                     .or_insert_with(|| ble_characteristic);
-                characteristics_result.push(characteristic);
             }
-            return Ok(characteristics_result);
+            return Ok(());
         }
         Err(Error::NotConnected)
     }
